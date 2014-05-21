@@ -15,6 +15,8 @@ LOOK_AHEAD = 5 * 44100
 PREROLL_LIMIT = 11520
 REWIND = 5 * 44100
 SILENCE = b'LAME3.99.5UUUUUUUUUUUUUUUUUUUUUUUUU\xff\xfb\x10d\xdd\x8f\xf0\x00\x00i\x00\x00\x00\x08\x00\x00\r \x00\x00\x01\x00\x00\x01\xa4\x00\x00\x00 \x00\x004\x80\x00\x00\x04UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU'
+INITIAL_JITTER_BUF = 0.2
+MAX_JITTER_BUF = 5.0
 
 class RTPClock(object):
 	""" RTP/MPA clock sequence for MPEG frames (1152 samples @ 44100 Hz) for a 90000 Hz RTP clock """
@@ -122,7 +124,7 @@ class Channel(object):
 	def __init__(self, socket, reactor):
 		self.socket = socket
 		self.reactor = reactor
-		self.jitterBuffer = 0.2
+		self.jitterBuffer = INITIAL_JITTER_BUF
 		self.mediaStreams = {}
 		self._fetching = False
 		self.autoPaused = True
@@ -130,6 +132,7 @@ class Channel(object):
 		self.queue = collections.deque(maxlen=int((self.jitterBuffer*1225+31+32)/32))
 		self.hasHttpStreams = False
 		self.allHttpStreamsArePaused = False
+		self.lastUnderrun = 0
 
 	def getMasterApi(self):
 		return {
@@ -190,6 +193,7 @@ class Channel(object):
 		self.reactor.registerMonotonicClock(self.playClock)
 		self.reactor.registerMonotonicClock(self.queueClock)
 		self.reactor.scheduleMonotonic(self.playClock.value, self._play)
+		self.lastUnderrun = self.playClock.value
 		self._fetch()
 
 	def destroy(self):
@@ -266,7 +270,23 @@ class Channel(object):
 	def _play(self, t):
 		pc = self.playClock.value
 		while pc <= t:
-			payload = self.queue.popleft() if self.queue else SILENCE
+			if self.queue:
+				payload = self.queue.popleft()
+			else:
+				payload = SILENCE
+				#print "Jitter buffer underrun occured; sending silence."
+				if (pc - self.lastUnderrun < 3600) and (pc - self.lastUnderrun > 10) and (self.jitterBuffer < MAX_JITTER_BUF):
+					self.jitterBuffer += 0.1
+					print "Adjusting jitter buffer. Now: ", self.jitterBuffer
+					self.queue = collections.deque(self.queue, maxlen=int((self.jitterBuffer*1225+31+32)/32))
+				if pc - self.lastUnderrun > 10:
+					self.lastUnderrun = pc
+				# todo: should we advance the queueclock? queue is empty and we're sending silence and
+				# advancing playclock but leave queueclock behind. deque's maxlen will handle that (any excess data
+				# will be dropped), but still we're sending silence and additionally may skip / discard as much music as
+				# we sent silence
+				# e.g.:
+				#self.queueClock.next()
 			for ms in self.mediaStreams.itervalues():
 				ms.send(SILENCE if ms.isPaused else payload)
 			if self.hasHttpStreams:
