@@ -124,7 +124,7 @@ class Channel(object):
 	def __init__(self, socket, reactor):
 		self.socket = socket
 		self.reactor = reactor
-		self.jitterBuffer = 0.2
+		self.jitterBuffer = 0.8
 		self.mediaStreams = {}
 		self._fetching = False
 		self.autoPaused = True
