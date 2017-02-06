@@ -8,7 +8,7 @@ import traceback
 
 from couchdb import ResourceNotFound
 
-from src.fade import Blender, LookAhead, Stable, FfmpegDecoder, EOF, SampleCounter, Skipper, Joiner, zeroer, Pauser
+from src.fade import Blender, LookAhead, Stable, SoxDecoder, EOF, SampleCounter, Skipper, Joiner, zeroer, Pauser
 from src.lame import Encoder
 from src.ipc import Async
 from src.reactor import Reactor, clock
@@ -486,7 +486,7 @@ class Worker(object):
 
 	def _preroll(self, la, info):
 		info2 = {"tooLate": False, "prerolled": None, "info": info}
-		decoder = FfmpegDecoder(info["path"].encode("UTF-8"), self.reactor, self.replayGain(info))
+		decoder = SoxDecoder(info["path"].encode("UTF-8"), self.reactor, self.replayGain(info))
 		if info["pos"] > 0:
 			skipped = Skipper(decoder, info["pos"])
 		else:
