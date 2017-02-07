@@ -150,7 +150,12 @@ class Connection(object):
 				doClose = True
 				self.close()
 			else:
-				self.sock.send(response)
+				try:
+					self.sock.send(response)
+				except Exception as e:
+					traceback.print_exc();
+					self.close()
+					return
 				self.queue.pop(0)
 				if data.get("connection") == "close" or doClose:
 					self.close()
