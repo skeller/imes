@@ -11,7 +11,7 @@ function UserStatus() {
 	this.scheduled = false;
 	this.displayChannel = null;
 
-	ajax_get(DB_URL + "_session?basic=true", this.sessionLoaded.bind(this));
+	ajax_get(DB_URL + "_session", this.sessionLoaded.bind(this));
 }
 
 UserStatus.prototype.sessionLoaded = function (session) {
