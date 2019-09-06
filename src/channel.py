@@ -71,6 +71,7 @@ class MediaStream(object):
 		hdr = self.HDR.pack(self.MAGIC, self.seqNo, self.clock.value, self.ssrc, 0)
 		try:
 			self.socket.sendto(hdr + payload, self.rtpAddr)
+			#self.socket.sendto(hdr + payload, self.rtpAddr)
 		except socket.error as e:
 			if e.errno != errno.ECONNREFUSED:
 				raise
@@ -124,7 +125,8 @@ class Channel(object):
 	def __init__(self, socket, reactor):
 		self.socket = socket
 		self.reactor = reactor
-		self.jitterBuffer = 0.8
+		#self.jitterBuffer = 0.8
+		self.jitterBuffer = 0.2
 		self.mediaStreams = {}
 		self._fetching = False
 		self.autoPaused = True

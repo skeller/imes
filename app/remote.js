@@ -41,7 +41,7 @@ var AJAX_GET_DEFAULT_CONFIG = {
 	"jsonResponse": true,
 	"headers": {},
 	"retryDelay": 10000,
-	"timeout": 20000
+	"timeout": 60000
 }
 
 var AJAX_POST_DEFAULT_CONFIG = {
@@ -53,7 +53,7 @@ var AJAX_POST_DEFAULT_CONFIG = {
 		"Content-Type": "application/json"
 	},
 	"retryDelay": 10000,
-	"timeout": 20000
+	"timeout": 60000
 }
 
 function apply_defaults(defaults, config) {
