@@ -121,6 +121,13 @@ class MPEGClock(object):
 			self.clock += 1
 			self.clock1225 -= 1225
 
+	def set(self, val):
+		self.clock = int(val)
+		self.clock1225 = int((val - self.clock) * 1225.0 + 0.5)
+		if self.clock1225 >= 1225:
+			self.clock += 1
+			self.clock1225 -= 1225
+
 class Channel(object):
 	def __init__(self, socket, reactor):
 		self.socket = socket
@@ -263,6 +270,16 @@ class Channel(object):
 			self.worker.fetch(callback=self._feed)
 
 	def _feed(self, data):
+		if not self.queue:
+			pc = self.playClock.value
+			qc = self.queueClock.value
+			print("queue empty on feed. pc: " + str(pc) + " qc: " + str(qc))
+			if qc < pc:
+				#unregisterMonotonicClock(self.queueClock)
+				#self.queueClock = MPEGClock(pc)
+				#registerMonotonicClock(self.queueClock)
+				self.queueClock.set(pc)
+
 		self.queue.append(data)
 
 		self.queueClock.next()
