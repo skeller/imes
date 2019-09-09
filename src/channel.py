@@ -134,6 +134,8 @@ class Channel(object):
 		self.queue = collections.deque(maxlen=int((self.jitterBuffer*1225+31+32)/32))
 		self.hasHttpStreams = False
 		self.allHttpStreamsArePaused = False
+		self.queue_empty_cnt = 0
+		self.queue_empty_log_ts = 0
 
 	def getMasterApi(self):
 		return {
@@ -272,7 +274,23 @@ class Channel(object):
 
 	def _play(self, t):
 		pc = self.playClock.value
-		while pc <= t:
+		if not self.queue:
+			if pc > self.queue_empty_log_ts + 30:
+				print("queue is empty, pc: " + str(pc))
+				self.queue_empty_log_ts = pc
+			while pc <= t:
+				for ms in self.mediaStreams.itervalues():
+					ms.send(SILENCE)
+				if self.hasHttpStreams:
+					self.master.push(SILENCE)
+				self.playClock.next()
+				pc = self.playClock.value
+		while pc <= t and self.queue:
+			#if not self.queue and self.queue_empty_cnt < 10:
+			#	self.queue_empty_cnt = self.queue_empty_cnt + 1
+			#	break
+			#else:
+			#	self.queue_empty_cnt = 0
 			payload = self.queue.popleft() if self.queue else SILENCE
 			for ms in self.mediaStreams.itervalues():
 				ms.send(SILENCE if ms.isPaused else payload)
