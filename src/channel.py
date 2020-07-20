@@ -133,7 +133,9 @@ class Channel(object):
 		self.socket = socket
 		self.reactor = reactor
 		#self.jitterBuffer = 0.8
-		self.jitterBuffer = 0.2
+		#self.jitterBuffer = 0.2
+		#self.jitterBuffer = 0.6
+		self.jitterBuffer = 1.8
 		self.mediaStreams = {}
 		self._fetching = False
 		self.autoPaused = True
@@ -293,7 +295,7 @@ class Channel(object):
 		pc = self.playClock.value
 		if not self.queue:
 			if pc > self.queue_empty_log_ts + 30:
-				print("queue is empty, pc: " + str(pc))
+				print("queue is empty, pc: " + str(pc) + " qc: " + str(self.queueClock.value))
 				self.queue_empty_log_ts = pc
 			while pc <= t:
 				for ms in self.mediaStreams.itervalues():
@@ -301,7 +303,11 @@ class Channel(object):
 				if self.hasHttpStreams:
 					self.master.push(SILENCE)
 				self.playClock.next()
+				# we need to advance queue clock if we send dummy silence:
+				#self.queueClock.next()
 				pc = self.playClock.value
+			if pc < t + 0.1:
+				pc = t + 0.1
 		while pc <= t and self.queue:
 			#if not self.queue and self.queue_empty_cnt < 10:
 			#	self.queue_empty_cnt = self.queue_empty_cnt + 1
@@ -316,7 +322,8 @@ class Channel(object):
 			self.playClock.next()
 			pc = self.playClock.value
 
-		self.reactor.scheduleMonotonic(pc, self._play)
+		#self.reactor.scheduleMonotonic(pc, self._play)
+		self.reactor.scheduleMonotonic(pc if pc >= t else t + 0.08, self._play)
 
 		if not self._fetching:
 			self._fetch()
