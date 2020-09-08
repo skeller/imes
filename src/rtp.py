@@ -368,10 +368,10 @@ class Connection(object):
 			raise Exception("not authorized")
 
 	def _doHttpDevice(self, request, uri, data, body, device, cmd, args, callback, query):
-		if request != "GET" or cmd != "stream.mp3" or args or query:
+		if request != "GET" or cmd != "stream.raw" or args or query:
 			raise Exception("not authorized")
 		response = Response("HTTP/1.1")
-		response.setHeader("Content-Type", "audio/mpeg") # TODO: correct?
+		response.setHeader("Content-Type", "audio/l16;rate=48000;channels=2") # TODO: correct?
 		response.setHeader("Connection", "close")
 		self.reactor.unregister(self.sock.fileno())
 		self.sock.send(response.assemble())
@@ -417,8 +417,8 @@ s=unnamed
 c=IN IPV4 0.0.0.0
 t=0 0
 a=recvonly
-m=audio 0 RTP/AVP 14
-a=rtpmap:14 mpa/90000/2
+m=audio 0 RTP/AVP 98
+a=rtpmap:98 L16/48000/2
 """
 			return "RTSP/1.0 200 OK\r\nCSeq: %s\r\nContent-Type: application/sdp\r\nContent-Length: %d\r\n\r\n" % (data["cseq"], len(sdp)) + sdp
 		elif request == "SETUP":

@@ -8,39 +8,33 @@ import traceback
 
 from couchdb import ResourceNotFound
 
-from src.fade import Blender, LookAhead, Stable, SoxDecoder, EOF, SampleCounter, Skipper, Joiner, zeroer, Pauser
+from src.fade import Blender, LookAhead, Stable, SoxDecoder, EOF, SampleCounter, Skipper, Joiner, zeroer, Pauser, SAMPLE_RATE
 from src.lame import Encoder
 from src.ipc import Async
 from src.reactor import Reactor, clock
 
-LOOK_AHEAD = 5 * 44100
-PREROLL_LIMIT = 11520
-REWIND = 5 * 44100
-SILENCE = b'LAME3.99.5UUUUUUUUUUUUUUUUUUUUUUUUU\xff\xfb\x10d\xdd\x8f\xf0\x00\x00i\x00\x00\x00\x08\x00\x00\r \x00\x00\x01\x00\x00\x01\xa4\x00\x00\x00 \x00\x004\x80\x00\x00\x04UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU'
+LOOK_AHEAD = 5 * SAMPLE_RATE
+PREROLL_LIMIT = SAMPLE_RATE / 1000 * 20 * 10
+REWIND = 5 * SAMPLE_RATE
+SILENCE = b'\0' * (SAMPLE_RATE / 1000 * 20 * 4) # 20 ms L16 stereo
 
 class RTPClock(object):
-	""" RTP/MPA clock sequence for MPEG frames (1152 samples @ 44100 Hz) for a 90000 Hz RTP clock """
+	""" RTP/L16 clock sequence for L16 frames (20ms samples @ 48000 Hz) for a 48000 Hz RTP clock """
 
-	# RTP/MPA clock is 90000 Hz, at 1225/32 frames per second this gives us 115200/49 ( = 2351 + 1/49) RTP samples per frame
+	# RTP/L16 clock is 48000 Hz, 960 RTP samples per frame
 	def __init__(self, initial=None):
 		if initial is None:
 			self.value = 0
-			self.clock49 = 0
-		elif isinstance(initial, tuple):
-			self.value, self.clock49 = initial
+		elif isinstance(initial, int):
+			self.value  = initial
 		else:
 			self.value = initial.clock
-			self.clock49 = initial.clock49
 
 	def export(self):
-		return self.value, self.clock49
+		return self.value
 
 	def next(self):
-		self.value += 2351
-		self.clock49 += 1
-		if self.clock49 == 49:
-			self.value += 1
-			self.clock49 = 0
+		self.value += 960
 		if self.value >= 2**32:
 			self.value -= 2**32
 
@@ -51,12 +45,12 @@ class MediaStream(object):
 			| (0 << 12) # X = 0
 			| (0 << 8) # CC = 0
 			| (0 << 7) # M = 0
-			| (14) # PT = 14
+			| (98) # PT = 98
 		)
 
-	HDR = struct.Struct("!HHIII")
+	HDR = struct.Struct("!HHII")
 
-	def __init__(self, socket, ssrc, rtpAddr, paused=False, clock=(0, 0), seqNo=None):
+	def __init__(self, socket, ssrc, rtpAddr, paused=False, clock=0, seqNo=None):
 		self.isPaused = self.shouldBePaused = paused
 		self.socket = socket
 		self.ssrc = ssrc
@@ -68,7 +62,7 @@ class MediaStream(object):
 		return self.clock.export(), self.seqNo
 
 	def send(self, payload):
-		hdr = self.HDR.pack(self.MAGIC, self.seqNo, self.clock.value, self.ssrc, 0)
+		hdr = self.HDR.pack(self.MAGIC, self.seqNo, self.clock.value, self.ssrc)
 		try:
 			self.socket.sendto(hdr + payload, self.rtpAddr)
 			#self.socket.sendto(hdr + payload, self.rtpAddr)
@@ -83,50 +77,50 @@ class MediaStream(object):
 		self.refresh()
 
 class MPEGClock(object):
-	""" real time sequence for MPEG frames (1152 samples @ 44100 Hz) """
+	""" real time sequence for L16 frames (960 samples @ 48000 Hz) """
 
 	# an MPEG 1 Layer 3 frame has 1152 samples, at 44110 Hz this gives us 1225/32 frames per second
 	def __init__(self, initial=None):
 		if initial is None or isinstance(initial, (int, float)):
 			c = clock() if initial is None else initial
 			self.clock = int(c)
-			self.clock1225 = int((c - self.clock) * 1225.0 + 0.5)
-			if self.clock1225 >= 1225:
+			self.clockms = int((c - self.clock) * 1000 + 0.5)
+			if self.clockms >= 1000:
 				self.clock += 1
-				self.clock1225 -= 1225
+				self.clockms -= 1000
 		else:
 			self.clock = initial.clock
-			self.clock1225 = initial.clock1225
+			self.clockms = initial.clockms
 
 	@property
-	def value(self, _1225 = 1.0 / 1225):
-		return self.clock + self.clock1225 * _1225
+	def value(self, _1000 = 1.0 / 1000):
+		return self.clock + self.clockms * _1000
 
 	def adjust(self, dt):
 		""" adjust for non-monotonic time """
 		idt = int(dt)
-		frac = int((dt - idt) * 1225.0 + 0.5)
+		frac = int((dt - idt) * 1000.0 + 0.5)
 		self.clock += idt
-		self.clock1225 += frac
-		if self.clock1225 < 0:
-			self.clock1225 += 1225
+		self.clockms += frac
+		if self.clockms < 0:
+			self.clockms += 1000
 			self.clock -= 1
-		elif self.clock1225 >= 1225:
-			self.clock1225 -= 1225
+		elif self.clockms >= 1000:
+			self.clockms -= 1000
 			self.clock += 1
 
 	def next(self):
-		self.clock1225 += 32
-		if self.clock1225 >= 1225:
+		self.clockms += 20
+		if self.clockms >= 1000:
 			self.clock += 1
-			self.clock1225 -= 1225
+			self.clockms -= 1000
 
 	def set(self, val):
 		self.clock = int(val)
-		self.clock1225 = int((val - self.clock) * 1225.0 + 0.5)
-		if self.clock1225 >= 1225:
+		self.clockms = int((val - self.clock) * 1000.0 + 0.5)
+		if self.clockms >= 1000:
 			self.clock += 1
-			self.clock1225 -= 1225
+			self.clockms -= 1000
 
 class Channel(object):
 	def __init__(self, socket, reactor):
@@ -140,7 +134,7 @@ class Channel(object):
 		self._fetching = False
 		self.autoPaused = True
 		self._think = False
-		self.queue = collections.deque(maxlen=int((self.jitterBuffer*1225+31+32)/32))
+		self.queue = collections.deque(maxlen=int((self.jitterBuffer*SAMPLE_RATE)*2))
 		self.hasHttpStreams = False
 		self.allHttpStreamsArePaused = False
 		self.queue_empty_cnt = 0
@@ -345,9 +339,9 @@ class Worker(object):
 		self.src = Stable(EOF, True)
 		self.reactor = reactor
 
-		self.blendTime = 44100 // 2
+		self.blendTime = SAMPLE_RATE // 2
 
-		self.temp = bytearray("\x00" * 2048)
+		self.temp = bytearray("\x00" * 2048 * 20)
 		self.view = memoryview(self.temp)
 
 		self.status = self.db.get(self.key, {})

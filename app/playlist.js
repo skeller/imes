@@ -155,10 +155,10 @@ Playlist.prototype.updateProgressBar = function(pb) {
 	var
 		el = pb.parentElement,
 		length = parseFloat(el.dataset.length),
-		total = length ? Math.floor(length * 44100 + 0.5) : 0,
-		samplePos = pos.pos + Math.floor((now - t0) * 44.1 + 0.5);
+		total = length ? Math.floor(length * 48000 + 0.5) : 0,
+		samplePos = pos.pos + Math.floor((now - t0) * 48 + 0.5);
 
-	el.getElementsByClassName("length-indicator")[0].firstChild.textContent = formatLength(length, samplePos / 44100);
+	el.getElementsByClassName("length-indicator")[0].firstChild.textContent = formatLength(length, samplePos / 48000);
 
 	if (samplePos >= total) {
 		pb.style.backgroundColor = "red";

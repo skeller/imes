@@ -4,12 +4,12 @@ import subprocess
 import os
 import errno
 
-SAMPLE_RATE = 44100
-BUFFER_SIZE = 1152
+SAMPLE_RATE = 48000
+BUFFER_SIZE = SAMPLE_RATE / 1000 * 20
 SAMPLE_TYPE = numpy.int16
 SAMPLE_SIZE = len(numpy.zeros(1, SAMPLE_TYPE).view(numpy.uint8))
 NUM_CHANNELS = 2
-PREROLL_SAMPLES = 11520
+PREROLL_SAMPLES = BUFFER_SIZE * 10
 
 def makeBlender(samples, channels=NUM_CHANNELS,
 	cache={},

@@ -368,7 +368,7 @@ Settings.prototype.categories = {
 					function(data) { return data.authToken; },
 					function(data) {
 						var u1 = RTSP_BACKEND + "device/" + item + "/" + data.authToken;
-						var u2 = DELEGATE_BACKEND + "device/" + item + "/" + data.authToken + "/stream.mp3";
+						var u2 = DELEGATE_BACKEND + "device/" + item + "/" + data.authToken + "/stream.raw";
 						url1.textContent = u1;
 						url2.textContent = u2;
 						open.href = u2;
