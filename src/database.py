@@ -645,7 +645,7 @@ class Database(object):
 			if key is None:
 				print("broken picture in %s" % (path,))
 				continue
-			pictures.append({"type": p.type, "desc": p.desc, "key": key, "formats": formats})
+			pictures.append({"type": int(p.type), "desc": p.desc, "key": key, "formats": formats})
 
 		doc["pictures"] = pictures
 
@@ -720,7 +720,7 @@ class Database(object):
 				if key is None:
 					print("broken picture in %s" % (path,))
 					continue
-				pictures.append({"type": p.type, "desc": p.desc, "key": key, "formats": formats})
+				pictures.append({"type": int(p.type), "desc": p.desc, "key": key, "formats": formats})
 
 		doc["pictures"] = pictures
 		self._apev2(doc, path)
@@ -913,11 +913,11 @@ class Database(object):
 		if "bitrate_mode" in info["info"]:
 			info["info"]["bitrate_mode"] = int(info["info"]["bitrate_mode"])
 
-		#print path
-		#print info
+		print path
+		print info
 		self._temp.discard(k)
 		self.db[k] = info
-		#print "done processing file"
+		print "done processing file"
 
 	def move(self, srcPath, dstPath):
 		for row in self.db.view("_design/file/_view/path")[srcPath]:
